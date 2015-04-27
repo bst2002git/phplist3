@@ -1,4 +1,5 @@
 <?php
+
 require_once dirname(__FILE__).'/accesscheck.php';
 
 if (isset($_GET['id'])) {
@@ -15,10 +16,10 @@ $actionresult = '';
 
 $useremail = isset($_GET["useremail"]) && is_email($_GET["useremail"]) ? $_GET["useremail"] : ''; ## @TODO sanitize
 $deletebounce = isset($_GET["deletebounce"]); #BUGFIX #15286 - nickyoung
-$amount = isset($_GET["amount"]) ? sprintf('%d',$_GET["amount"]) : ''; #BUGFIX #15286 - CS2
-$unconfirm = isset($_GET["unconfirm"]); #BUGFIX #15286 - CS2
+$amount = isset($_GET["amount"]) ? sprintf('%d',$_GET["amount"]) : ''; #BUGFIX #15286 - CS2 
+$unconfirm = isset($_GET["unconfirm"]); #BUGFIX #15286 - CS2 
 $maketext = isset($_GET["maketext"]); #BUGFIX #15286 - CS2
-$deleteuser = isset($_GET["deleteuser"]);  #BUGFIX #15286 - CS2
+$deleteuser = isset($_GET["deleteuser"]);  #BUGFIX #15286 - CS2 
 
 $type = '';
 if (isset($_GET['type'])) {
@@ -136,7 +137,7 @@ if ($id) {
       $tables["user"],$guessedid));
     $guessedemail = $emailreq[0];
   }
-
+  
   $newruleform = '<form method=post action="./?page=bouncerules">';
   $newruleform .= '<table class="bounceListing">';
   $newruleform .= sprintf('<tr><td>%s</td><td><input type="text" name="newrule" size="30" /></td></tr>',$GLOBALS['I18N']->get('Regular Expression'));
@@ -169,15 +170,15 @@ if ($id) {
   if (USE_ADVANCED_BOUNCEHANDLING) {
     $actionpanel .= '<p class="button"><a href="#newrule">'.$GLOBALS['I18N']->get('Create New Rule based on this bounce').'</a></p>';
   }
-
+  
   $p = new UIPanel($GLOBALS['I18N']->get('Possible Actions:'),$actionpanel);
   print $p->display();
-
+   
   $transfer_encoding = '';
   if (preg_match('/Content-Transfer-Encoding: ([\w-]+)/i',$bounce["header"],$regs)) {
     $transfer_encoding = strtolower($regs[1]);
   } elseif (0 && preg_match('/Content-Type: multipart\/mixed;\s+boundary="([^"]+)"/im',$bounce['header'],$regs)) {
-    ## @TODO, this needs more work, but probably easier to find a class that can
+    ## @TODO, this needs more work, but probably easier to find a class that can 
     ## split is all into itś parts
 #    print "BOUNDARY: ". $regs[1];
     $multi_part_boundary = $regs[1];
@@ -188,55 +189,19 @@ if ($id) {
  #     $transfer_encoding = strtolower($regs[1]);
     }
   }
-
-//chpock
-
-function mimedecode($text) {
-	require_once('Mail/mimeDecode.php');
-	$params['include_bodies'] = true;
-	$params['decode_bodies']  = false;
-	$params['decode_headers'] = true;
-
-	$decoder = new Mail_mimeDecode($text);
-	$structure=$decoder->decode($params);
-	return $structure;
-}
-
-//chpock end
-
+    
   switch ($transfer_encoding) {
     case 'quoted-printable':
       $bounceBody = imap_qprint($bounce["data"]);break;
-    case 'base64':
+    case 'base64': 
       $bounceBody = imap_base64($bounce['data']);break;
     case '7bit':
     case '8bit':
     default:
       $bounceBody = $bounce['data'];
   }
-
-//chpock
-//always
-	$email_decoded=mimedecode($bounce['header'].$bounce['data']);
-	$bounceBody=$email_decoded->body;
-
-	//FIX body bad coded charset, bad_utf8
-	/**
-	*
-	*/
-
-	function encodeToUTF8($string) {
-		return mb_convert_encoding($string, "UTF-8", mb_detect_encoding($string, "UTF-8, ISO-8859-1, ISO-8859-15", true));
-	}
-	$_bounceBody=htmlspecialchars($bounceBody);
-	if (empty($_bounceBody)) {
-		$bounceBody=encodeToUTF8($bounceBody);
-	}
-	$bounceBody=htmlspecialchars($bounceBody);
-	if (LIMIT_ADVANCED_BODYLENGTH_REGEX>0 && strlen($bounceBody)>LIMIT_ADVANCED_BODYLENGTH_REGEX) {
-		$bounceBody= substr($bounceBody, 0, LIMIT_ADVANCED_BODYLENGTH_REGEX) . '...(LIMIT_ADVANCED_BODYLENGTH_REGEX='.LIMIT_ADVANCED_BODYLENGTH_REGEX.'char active)';
-	}
-	$bouncedetail = sprintf ('
+  
+  $bouncedetail = sprintf ('
   <div class="fleft"><div class="label">'.$GLOBALS['I18N']->get('ID').'</div><div class="content">%d</div></div>
   <div class="fleft"><div class="label">'.$GLOBALS['I18N']->get('Date').'</div><div class="content">%s</div></div>
   <div class="fleft"><div class="label">'.$GLOBALS['I18N']->get('Status').'</div><div class="content">%s</div></div>
@@ -245,12 +210,12 @@ function mimedecode($text) {
   <div class="label">'.$GLOBALS['I18N']->get('Header').'</div><div class="content">%s</div><br />
   <div class="label">'.$GLOBALS['I18N']->get('Body').'</div><div class="content">%s</div>',$id,
   $bounce["date"],$bounce["status"],$bounce["comment"],
-  nl2br(htmlspecialchars($bounce["header"])),nl2br($bounceBody));
+  nl2br(htmlspecialchars($bounce["header"])),nl2br(htmlspecialchars($bounceBody)));
 #   print '<tr><td colspan="2"><p class="submit"><input type="submit" name=change value="Save Changes"></p>';
 
   $p = new UIPanel(s('Bounce Details'),$bouncedetail);
   print $p->display();
-
+  
   if (USE_ADVANCED_BOUNCEHANDLING) {
     $p = new UIPanel(s('New Rule').'<a name="newrule"></a>',$newruleform);
     print $p->display();
