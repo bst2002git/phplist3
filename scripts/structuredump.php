@@ -97,8 +97,7 @@ $pagetitles = array(
 'ajaxform', 
 'updatetranslation', 
 'reindex', 
-'plugins',
-'hostedprocessqueuesetup',
+'plugins'
 );
 ## add the pagetitles and hover
 foreach ($pagetitles as $pagetitle) {

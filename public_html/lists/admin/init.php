@@ -160,8 +160,6 @@ define('TRANSLATIONS_XML','https://translate.phplist.com/translations.xml');
 define('TLD_AUTH_LIST','https://www.phplist.com/files/tlds-alpha-by-domain.txt');
 define('TLD_AUTH_MD5','https://www.phplist.com/files/tlds-alpha-by-domain.txt.md5');
 define('TLD_REFETCH_TIMEOUT',15552000); ## 180 days, about 6 months
-define('PQAPI_URL','https://pqapi.phplist.com/1/t/pqapi');
-if (!defined('SHOW_PQCHOICE')) define('SHOW_PQCHOICE',false);
 
 // obsolete by rssmanager plugin
 // if (!defined("ENABLE_RSS")) define("ENABLE_RSS",0);
@@ -251,6 +249,7 @@ if (!defined('DOMAIN_BATCH_PERIOD')) define('DOMAIN_BATCH_PERIOD',120);
 if (!defined('DOMAIN_AUTO_THROTTLE')) define('DOMAIN_AUTO_THROTTLE',0);
 if (!defined('LANGUAGE_SWITCH')) define('LANGUAGE_SWITCH',1);
 if (!defined('USE_ADVANCED_BOUNCEHANDLING')) define('USE_ADVANCED_BOUNCEHANDLING',0);
+if (!defined('LIMIT_ADVANCED_BODYLENGTH_REGEX')) define('LIMIT_ADVANCED_BODYLENGTH_REGEX',15000);
 if (!defined('DATE_START_YEAR')) define('DATE_START_YEAR',1900);
 if (!defined('DATE_END_YEAR')) define('DATE_END_YEAR',0);
 if (!defined('ALLOW_IMPORT')) define('ALLOW_IMPORT',1);
@@ -381,9 +380,6 @@ $adminpages = preg_replace('~^//~','/',$adminpages);
 if (!isset($systemroot)) {
   $systemroot = dirname(__FILE__);
 }
-if (!isset($documentRoot)) {
-  $documentRoot = $_SERVER['DOCUMENT_ROOT'];
-}
 if (!defined('FORWARD_ALTERNATIVE_CONTENT')) define('FORWARD_ALTERNATIVE_CONTENT',0);
 if (!defined('KEEPFORWARDERATTRIBUTES')) define('KEEPFORWARDERATTRIBUTES',0);
 if (!defined('FORWARD_EMAIL_COUNT') ) define('FORWARD_EMAIL_COUNT',1);
@@ -458,7 +454,6 @@ $counters = array(
   'send blocked by domain throttle' => 0,
   'add attachment error' => 0,
   'sendemail returned false' => 0,
-  'sentastest' => 0,
 );
 
 $GLOBALS['disallowpages'] = array();

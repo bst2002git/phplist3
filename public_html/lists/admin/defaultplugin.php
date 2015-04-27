@@ -9,7 +9,6 @@ class phplistPlugin {
   public $version= "unknown";
   public $authors= "";
   public $description = 'No description';
-  public $documentationUrl = '';## link to documentation for this plugin (eg https://resources.phplist.com/plugin/pluginname
   public $enabled = 1; // use directly, can be privitsed later and calculated with __get and __set
   public $system_root = ''; ## root dir of the phpList admin directory
   #@@Some ideas to implement this:
@@ -76,21 +75,6 @@ class phplistPlugin {
     
   public $pageTitles = array();
   
-  /* dependency check
-   * 
-   * provides tests to determine whether this plugin can be used
-   * example:
-   *    array(
-   *        'description of dependency' => condition for plugin to be enabled
-   *    )
-   */
-  function dependencyCheck()
-  {
-      return array(
-        'phpList version' => version_compare(VERSION, '3.0.12') >= 0
-      );
-  }
-
   function name() {
     return $this->name;
   }
@@ -807,6 +791,5 @@ class phplistPlugin {
     # see if a plugin is enabled, static method so it can be called even if existance of plugin is unknown.
     return array_key_exists($pluginName, $GLOBALS['plugins']) && $GLOBALS['plugins'][$pluginName]->enabled;
   }
-
 };
 ?>

@@ -30,12 +30,12 @@ if (!empty($_POST['resend']) && is_array($_POST['list'])) {
     $res = Sql_query("select * from $tables[list]");
     while($list = Sql_fetch_array($res))
       if ($list["active"]) {
-        $result = Sql_query(sprintf('insert into %s (messageid,listid,entered) values(%d,%d,now())',$tables['listmessage'],$id,$list['id']));
+        $result = Sql_query(sprintf('insert into %s (messageid,listid,entered) values(%d,%d,current_timestamp)',$tables['listmessage'],$id,$list['id']));
       }
   } else {
     foreach($_POST['list'] as $key => $val) {
       if ($val == 'signup') {
-        $result = Sql_query(sprintf('insert into %s (messageid,listid,entered) values(%d,%d,now())',$tables['listmessage'],$id,$key));
+        $result = Sql_query(sprintf('insert into %s (messageid,listid,entered) values(%d,%d,current_timestamp)',$tables['listmessage'],$id,$key));
       }
     }
   }
@@ -67,7 +67,7 @@ if (isset($returnpage)) {
 }
 
 $result = Sql_query("SELECT * FROM {$tables['message']} where id = $id $owner_select_and");
-if (!Sql_Affected_Rows()) {
+if (!Sql_Num_Rows($result)) {
   print $GLOBALS['I18N']->get('No such message');
   return;
 }
@@ -117,9 +117,8 @@ if (ALLOW_ATTACHMENTS) {
   $req = Sql_Query("select * from {$tables["message_attachment"]},{$tables["attachment"]}
     where {$tables["message_attachment"]}.attachmentid = {$tables["attachment"]}.id and
     {$tables["message_attachment"]}.messageid = $id");
-  if (!Sql_Affected_Rows()) {
+  if (!Sql_Num_Rows($req))
     $content .= '<tr><td colspan="2">' . $GLOBALS['I18N']->get('No attachments') . '</td></tr>';
-  }
   while ($att = Sql_Fetch_array($req)) {
     $content .=sprintf ('<tr><td>%s:</td><td>%s</td></tr>', $GLOBALS['I18N']->get('Filename') ,$att["remotefile"]);
     $content .=sprintf ('<tr><td>%s:</td><td>%s</td></tr>', $GLOBALS['I18N']->get('Size'), formatBytes($att["size"]));
@@ -132,8 +131,8 @@ if (ALLOW_ATTACHMENTS) {
 $content .= '<tr><td colspan="2"><h4>' . $GLOBALS['I18N']->get('This campaign has been sent to subscribers, who are member of the following lists') . ':</h4></td></tr>';
 
 $lists_done = array();
-$result = Sql_Query(sprintf('select l.name, l.id from %s lm, %s l where lm.messageid = %d and lm.listid = l.id',$tables['listmessage'],$tables['list'],$id));
-if (!Sql_Affected_Rows())
+$result = Sql_Query("select l.name, l.id from $tables[listmessage] lm, $tables[list] l where lm.messageid = $id and lm.listid = l.id");
+if (!Sql_Num_Rows($result))
   $content .= '<tr><td colspan="2">' . $GLOBALS['I18N']->get('None yet') . '</td></tr>';
 while ($lst = Sql_fetch_array($result)) {
   array_push($lists_done,$lst['id']);
@@ -163,15 +162,13 @@ $result = Sql_query("SELECT * FROM $tables[list] $subselect");
 while ($row = Sql_fetch_array($result)) {
   if (!in_array($row['id'],$lists_done)) {
     $messlis .= '<li><input type="checkbox" name="list[' . $row["id"] . ']" value="signup" ';
-    if (isset($_POST['list'][$row["id"]]) && $_POST['list'][$row["id"]] == 'signup') {
+    if (isset($_POST['list'][$row["id"]]) && $_POST['list'][$row["id"]] == 'signup')
       $messlis .= 'checked="checked"';
-    }
     $messlis .= " />".$row['name'];
-    if ($row["active"]) {
-      $messlis .= ' (' . $GLOBALS['I18N']->get('Public list') . ')';
-    } else {
-      $messlis .= ' (' . $GLOBALS['I18N']->get('Private list') . ')';
-    }
+    if ($row["active"])
+      $messlis .= ' (' . $GLOBALS['I18N']->get('List is Active') . ')';
+    else
+      $messlis .= ' (' . $GLOBALS['I18N']->get('List is not Active') . ')';
     $some = 1;
     $messlis .= '</li>';
   }

@@ -1,21 +1,21 @@
 <?php
 
-if (is_file(dirname(__FILE__) .'/../../../VERSION')) { $fd = fopen (dirname(__FILE__) .'/../../../VERSION', "r"); while ($line = fscanf ($fd, "%[a-zA-Z0-9,. ]=%[a-zA-Z0-9,. ]")) { list ($key, $val) = $line; if ($key == "VERSION") $version = $val; } fclose($fd); } else { $version = "dev";} // ### remove on rollout ###
+
 
 if (!defined('VERSION')) {
   if (!ini_get('open_basedir') && is_dir(dirname(__FILE__).'/../../../.git')) {
-    define("VERSION",$version.'-dev');
+    define("VERSION","3.0.10");
     define('DEVVERSION',true);
   } else {
-    define("VERSION",$version);
+    define("VERSION","3.0.10");
     define('DEVVERSION',false);
   }
 } else {
   define(   'DEVVERSION'    ,false);
 }
 
-require_once dirname(__FILE__)."/inc/userlib.php";
-include_once dirname(__FILE__)."/inc/maillib.php";
+require_once dirname(__FILE__)."/commonlib/lib/userlib.php";
+include_once dirname(__FILE__)."/commonlib/lib/maillib.php";
 
 # set some variables
 if (!isset ($_GET["pi"]))
@@ -67,6 +67,13 @@ if (isset($message_envelope)) {
   
 include_once dirname(__FILE__)."/pluginlib.php";
 
+/*
+$database_schema = '';
+$database_connection = Sql_Connect($database_host,$database_user,$database_password,$database_name);
+Sql_Set_Search_Path($database_schema);
+*/
+
+
 ## this needs more testing, and docs on how to set the Timezones in the DB
 if (defined('SYSTEM_TIMEZONE')) {
 #  print('set time_zone = "'.SYSTEM_TIMEZONE.'"<br/>');
@@ -90,7 +97,7 @@ if (defined('SYSTEM_TIMEZONE')) {
 #  print "Time now: ".date('Y-m-d H:i:s').'<br/>';
 }
 
-if (!empty($GLOBALS["SessionTableName"])) { // rather undocumented feature, but seems to be used by some
+if (!empty($GLOBALS["SessionTableName"])) {
   include_once dirname(__FILE__)."/sessionlib.php";
 }
 
@@ -135,7 +142,7 @@ function SaveConfig($item,$value,$editable=1,$ignore_errors = 0) {
   ## to validate we need the actual values
   $value = str_ireplace('[domain]',$GLOBALS['domain'],$value);
   $value = str_ireplace('[website]',$GLOBALS['website'],$value);
-  
+ 
   switch ($configInfo['type']) {
     case 'boolean':
       if ($value == "false" || $value == "no") {
@@ -192,7 +199,7 @@ function SaveConfig($item,$value,$editable=1,$ignore_errors = 0) {
   ## and refresh the config immediately https://mantis.phplist.com/view.php?id=16693
   unset($GLOBALS['config']); 
   
-  Sql_Query(sprintf('replace into %s set item = "%s", value = "%s", editable = %d',$tables["config"],sql_escape($item),sql_escape($value),$editable));
+  Sql_Replace( $tables["config"], array('item'=>$item, 'value'=>$value, 'editable'=>$editable), 'item');
   return false; ## true indicates error, and which one
 }
 
@@ -232,6 +239,13 @@ if (!TEST && REGISTER) {
     $PoweredBy = $PoweredByText;
   }
 }
+
+//chpock
+$PoweredByText='';
+$PoweredByImage='';
+$PoweredBy='';
+
+
 # some other configuration variables, which need less tweaking
 # number of users to show per page if there are more
 define ("MAX_USER_PP",50);
@@ -970,9 +984,8 @@ function topMenu() {
 ### hmm, these really should become objects
 function PageLink2($name,$desc="",$url="",$no_plugin = false,$title = '') {
   $plugin = '';
-  if ($url) {
+  if ($url)
     $url = "&amp;".$url;
-  }
 
   if (in_array($name,$GLOBALS['disallowpages'])) return '';
   if (strpos($name,'&') !== false) {
@@ -1008,11 +1021,8 @@ function PageLink2($name,$desc="",$url="",$no_plugin = false,$title = '') {
     }
   }
   
-  $pqChoice = getConfig('pqchoice');
-  $hideProcessQueue = !MANUALLY_PROCESS_QUEUE || $pqChoice == 'phplistdotcom';
-  
   if ($access == "owner" || $access == "all" || $access == "view") {
-    if ($name == "processqueue" && $hideProcessQueue)
+    if ($name == "processqueue" && !MANUALLY_PROCESS_QUEUE)
       return "";#'<!-- '.$desc.'-->';
     elseif ($name == "processbounces" && !MANUALLY_PROCESS_BOUNCES) return ""; #'<!-- '.$desc.'-->';
     else {
@@ -1138,13 +1148,13 @@ function ListofLists($current,$fieldname,$subselect) {
   if (!empty($current["all"])) {
     $categoryhtml['all'] .= "checked";
   }
-  $categoryhtml['all'].= ' />'.s('All Lists').'</li>';
+  $categoryhtml['all'].= ' />'.$GLOBALS['I18N']->get('All Lists').'</li>';
 
   $categoryhtml['all'] .= '<li><input type="checkbox" name="'.$fieldname.'[allactive]"';
   if (!empty($current["allactive"])) {
     $categoryhtml['all'] .= 'checked="checked"';
   }
-  $categoryhtml['all'] .= ' />'.s('All Public Lists').'</li>';
+  $categoryhtml['all'] .= ' />'.$GLOBALS['I18N']->get('All Active Lists').'</li>';
 
   ## need a better way to suppress this
   if ($_GET['page'] != 'send') {
@@ -1174,9 +1184,9 @@ function ListofLists($current,$fieldname,$subselect) {
     }
     $categoryhtml[$list['category']] .= " />".htmlspecialchars(stripslashes($list["name"]));
     if ($list["active"]) {
-      $categoryhtml[$list['category']] .= ' <span class="activelist">'.$GLOBALS['I18N']->get('Public list').'</span>';
+      $categoryhtml[$list['category']] .= ' (<span class="activelist">'.$GLOBALS['I18N']->get('Public list').'</span>)';
     } else {
-      $categoryhtml[$list['category']] .= ' <span class="inactivelist">'.$GLOBALS['I18N']->get('Private list').'</span>';
+      $categoryhtml[$list['category']] .= ' (<span class="inactivelist">'.$GLOBALS['I18N']->get('Private list').'</span>)';
     }
 
     if (!empty($list["description"])) {
@@ -1345,7 +1355,7 @@ function dbg($variable, $description = 'Value', $nestingLevel = 0) {
 function PageData($id) {
   global $tables;
   $req = Sql_Query(sprintf('select * from %s where id = %d',$tables["subscribepage_data"],$id));
-  if (!Sql_Affected_Rows()) {
+  if (!Sql_Num_Rows($req)) {
     $data = array();
     $data["header"] = getConfig("pageheader");
     $data["footer"] = getConfig("pagefooter");
@@ -1532,55 +1542,25 @@ function repeatMessage($msgid) {
 
   $data = loadMessageData($msgid);
   ## do not repeat when it has already been done
-  if ($data['repeatinterval'] == 0 || !empty($data['repeatedid']))
-    return;
+  if (!empty($data['repeatedid'])) return;
 
-  # calculate the future embargo, a multiple of repeatinterval minutes after the current embargo
-
+  # get the future embargo, either "repeat" minutes after the old embargo
+  # or "repeat" after this very moment to make sure that we're not sending the
+  # message every time running the queue when there's no embargo set.
   $msgdata = Sql_Fetch_Array_Query(
-    sprintf(
-        'SELECT *,
-        embargo +
-            INTERVAL (FLOOR(TIMESTAMPDIFF(MINUTE, embargo, GREATEST(embargo, NOW())) / repeatinterval) + 1) * repeatinterval MINUTE AS newembargo
-        FROM %s
-        WHERE id = %d AND now() < repeatuntil',
-        $GLOBALS["tables"]["message"],
-        $msgid
-    )
-  );
-
-  if (!$msgdata) {
-    logEvent("Message $msgid not repeated due to reaching the repeatuntil date");
-    return;
-  }
-
-  # check whether the new embargo is not on an exclusion
-  if (isset($GLOBALS["repeat_exclude"]) && is_array($GLOBALS["repeat_exclude"])) {
-    $loopcnt = 0;
-
-    while (excludedDateForRepetition($msgdata["newembargo"])) {
-      if (++$loopcnt > 15) {
-        logEvent("Unable to find new embargo date too many exclusions? for message $msgid");
-        return;
-      }
-      $result = Sql_Fetch_Array_Query(
-          sprintf(
-            "SELECT '%s' + INTERVAL repeatinterval MINUTE AS newembargo
-            FROM %s
-            WHERE id = %d",
-            $msgdata["newembargo"],
-            $GLOBALS["tables"]["message"],
-            $msgid
-          )
-      );
-      $msgdata['newembargo'] = $result['newembargo'];
-    }
-  }
+    sprintf('select *,date_add(embargo,interval repeatinterval minute) as newembargo,
+      date_add(now(),interval repeatinterval minute) as newembargo2, date_add(embargo,interval repeatinterval minute) > now() as isfuture
+      from %s where id = %d and repeatuntil > now()',$GLOBALS["tables"]["message"],$msgid));
+  if (!$msgdata["id"] || !$msgdata["repeatinterval"]) return;
 
   # copy the new message
-  Sql_Query(sprintf('
-    insert into %s (entered) values(now())',$GLOBALS["tables"]["message"]));
-  $newid = Sql_Insert_id();
+  $query
+  = ' insert into ' . $GLOBALS['tables']['message']
+  . '    (entered)'
+  . ' values'
+  . '    (current_timestamp)';
+  Sql_Query($query);
+  $newid = Sql_Insert_Id($GLOBALS['tables']['message'], 'id');
   require dirname(__FILE__).'/structure.php';
   if (!is_array($DBstruct["message"])) {
     logEvent("Error including structure when trying to duplicate message $msgid");
@@ -1592,14 +1572,33 @@ function repeatMessage($msgid) {
         $GLOBALS["tables"]["message"],$column,addslashes($msgdata[$column]),$newid));
      }
   }
-  $req = Sql_Query(sprintf(
-    "SELECT *
-    FROM %s
-    WHERE id = %d AND name NOT IN ('id')",
-    $GLOBALS['tables']['messagedata'],$msgid
-  ));
+  $req = Sql_Query(sprintf('select * from %s where id = %d',
+    $GLOBALS['tables']['messagedata'],$msgid));
   while ($row = Sql_Fetch_Array($req)) {
     setMessageData($newid,$row['name'],$row['data']);
+  }
+
+  # check whether the new embargo is not on an exclusion
+  if (isset($GLOBALS["repeat_exclude"]) && is_array($GLOBALS["repeat_exclude"])) {
+    $repeatinterval = $msgdata["repeatinterval"];
+    $loopcnt = 0;
+    while (excludedDateForRepetition($msgdata["newembargo"])) {
+      $repeat += $msgdata["repeatinterval"];
+      $loopcnt++;
+      $msgdata = Sql_Fetch_Array_Query(
+          sprintf('select *,date_add(embargo,interval %d minute) as newembargo,
+            date_add(current_timestamp,interval %d minute) as newembargo2, date_add(embargo,interval %d minute) > current_timestamp as isfuture
+            from %s where id = %d and repeatuntil > current_timestamp',$repeatinterval,$repeatinterval,$repeatinterval,
+            $GLOBALS["tables"]["message"],$msgid));
+      if ($loopcnt > 15) {
+        logEvent("Unable to find new embargo date too many exclusions? for message $msgid");
+        return;
+      }
+    }
+  }
+  # correct some values
+  if (!$msgdata["isfuture"]) {
+    $msgdata["newembargo"] = $msgdata["newembargo2"];
   }
 
   Sql_Query(sprintf('update %s set embargo = "%s",status = "submitted",sent = "" where id = %d',
@@ -1618,7 +1617,7 @@ function repeatMessage($msgid) {
   # lists
   $req = Sql_Query(sprintf('select listid from %s where messageid = %d',$GLOBALS["tables"]["listmessage"],$msgid));
   while ($row = Sql_Fetch_Row($req)) {
-    Sql_Query(sprintf('insert into %s (messageid,listid,entered) values(%d,%d,now())',
+    Sql_Query(sprintf('insert into %s (messageid,listid,entered) values(%d,%d,current_timestamp)',
       $GLOBALS["tables"]["listmessage"],$newid,$row[0]));
   }
 
@@ -1638,16 +1637,13 @@ function repeatMessage($msgid) {
       values("%s","%s","%s","%s",%d)',
       $GLOBALS["tables"]["attachment"],addslashes($row["filename"]),addslashes($row["remotefile"]),
       addslashes($row["mimetype"]),addslashes($row["description"]),$row["size"]));
-    $attid = Sql_Insert_id();
+    $attid = Sql_Insert_Id($GLOBALS['tables']['attachment'], 'id');
     Sql_Query(sprintf('insert into %s (messageid,attachmentid) values(%d,%d)',
       $GLOBALS["tables"]["message_attachment"],$newid,$attid));
   }
   logEvent("Message $msgid was successfully rescheduled as message $newid");
   ## remember we duplicated, in order to avoid doing it again (eg when requeuing)
   setMessageData($msgid,'repeatedid',$newid);
-  if (getConfig('pqchoice') == 'phplistdotcom') {
-     activateRemoteQueue();
-  }
 }
 
 function versionCompare($thisversion,$latestversion) {

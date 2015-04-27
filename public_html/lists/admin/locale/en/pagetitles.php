@@ -8,7 +8,7 @@ switch ($page) {
   case 'list': $page_title = 'Subscriber lists';break;
   case 'catlists': $page_title = 'Categorise lists';break;
   case 'editattributes': $page_title = 'Configure attributes';break;
-  case 'editlist': $page_title = 'Edit or add a list';break;
+  case 'editlist': $page_title = 'Edit a list';break;
   case 'checki18n': $page_title = 'Check that translations exist';break;
   case 'importsimple': $page_title = 'Import subscribers by cut-and-paste';break;
   case 'import4': $page_title = 'Import subscribers from a remote database';break;
@@ -73,7 +73,6 @@ switch ($page) {
   case 'updatetranslation': $page_title = 'Update translations'; break;
   case 'reindex': $page_title = 'Re-index DB'; break;
   case 'plugins': $page_title = 'Manage Plugins'; break;
-  case 'hostedprocessqueuesetup': $page_title = 'Set up remote queue processing'; break;
 
   default: $page_title = $page;
     if (0) { ## discover new titles

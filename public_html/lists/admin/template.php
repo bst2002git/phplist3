@@ -126,7 +126,7 @@ if (!empty($_POST['action']) && $_POST['action'] == "addimages") {
   if ($templateok) {
     if (!$id) {
       Sql_Query(sprintf('insert into %s (title) values("%s")',$tables['template'],sql_escape($title)));
-      $id = Sql_Insert_id();
+      $id = Sql_Insert_Id($tables['template'], 'id');
     }
     Sql_Query(sprintf('update %s set title = "%s",template = "%s" where id = %d',
        $tables["template"],sql_escape($title),sql_escape($content),$id));
@@ -183,12 +183,8 @@ if (!empty($_POST['action']) && $_POST['action'] == "addimages") {
       if (empty($_POST['sendtest'])) return;
   #    return;
     } else {
-      $_SESSION['action_result'] = s('Template was successfully saved');
-#      print '<p class="information">'.$GLOBALS['I18N']->get('Template does not contain local images')."</p>";
-      if (empty($_POST['sendtest'])) {
-        Redirect('templates');
-        return;
-      }
+      print '<p class="information">'.$GLOBALS['I18N']->get('Template does not contain local images')."</p>";
+      if (empty($_POST['sendtest'])) return;
   #    return;
     }
   } else {

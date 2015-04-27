@@ -3,24 +3,26 @@ require_once dirname(__FILE__).'/accesscheck.php';
 
 print formStart('class="listListing"');
 $some = 0;
-if (isset($_GET['start'])) {
-  $s = sprintf('%d',$_GET['start']);
+if (isset($_GET['s'])) {
+  $s = sprintf('%d',$_GET['s']);
 } else {
   $s = 0;
 }
 $baseurl = './?page=list';
-$paging = '';
 
 $actionresult = '';
 
-if (isset($_POST['listorder']) && is_array($_POST['listorder'])) {
-    foreach ($_POST['listorder'] as $key => $val) {
-      $active = sprintf('%d',$_POST['active'][$key]);
-      $active = $active || listUsedInSubscribePage($key);
-      $query = sprintf('update %s set listorder = %d, active = %d where id = %d', $tables['list'],$val, $active, $key);
-      Sql_Query($query);
-    }
-}
+if (isset($_POST['listorder']) && is_array($_POST['listorder']))
+  while (list($key,$val) = each ($_POST['listorder'])) {
+    $active = empty($_POST['active'][$key]) ? '0' : '1';
+    $active = $active || listUsedInSubscribePage($key);
+    $query
+    = ' update %s'
+    . ' set listorder = ?, active = ?'
+    . ' where id = ?';
+    $query = sprintf($query, $tables['list']);
+    Sql_Query_Params($query, array($val, $active, $key));
+  }
 
 $access = accessLevel('list');
 switch ($access) {
@@ -126,9 +128,7 @@ if (sizeof($aListCategories)) {
   } else {
     $tabs->setCurrent(s('Uncategorised'));
   }
-  if (sizeof($aListCategories) > 1) {
-    print $tabs->display();
-  }
+  print $tabs->display();
 }
 $countquery
 = ' select *'
@@ -145,18 +145,18 @@ if ($total == 0 && sizeof($aListCategories) && $current == '' && empty($_GET['ta
 }
 
 print '<p class="total">'.$total .' '. $GLOBALS['I18N']->get('Lists').'</p>';
-if ($total > 50 && empty($_SESSION['showalllists'])) {
-  $paging = simplePaging("list",$s,$total,10,'&nbsp;');
-  $limit = " limit $s,10";
-} else {
-  $limit = '';
-}
+$limit = '';
 
-$result = Sql_query('select * from '.$tables['list'].' '.$subselect.' order by listorder '.$limit);
+$query
+= ' select *'
+. ' from ' . $tables['list']
+. $subselect
+. ' order by listorder '.$limit;
+
+$result = Sql_query($query);
 $numlists = Sql_Affected_Rows($result);
 
 $ls = new WebblerListing(s('Lists'));
-$ls->usePanel($paging);
 
 /** Always Show a "list" of all subscribers 
  * https://mantis.phplist.com/view.php?id=17433
@@ -200,7 +200,6 @@ if (SHOW_LIST_OFALL_SUBSCRIBERS && isSuperUser()) {
     '<span class="add_member">'.PageLink2('import',s('Add Members')).'</span>'.
     '<span class="delete">'.$deletebutton->show().'</span>'
     ,'','','actions nodrag');
-  $some = 1;
 }
 
 if ($numlists > 15) {
@@ -227,9 +226,14 @@ while ($row = Sql_fetch_array($result)) {
   ## same with blacklisted, but we're disregarding that for now, because blacklisted subscribers should not 
   ## be on the list at all. 
   ## @@TODO increase accuracy, without adding loads of queries.
-
-  $req = Sql_Query(sprintf('select count(u.id) as total,sum(u.confirmed) as confirmed, sum(u.blacklisted) as blacklisted 
-    from ' . $tables['listuser'] .' lu, '.$tables['user'].' u where u.id = lu.userid and listid = %d ',$row["id"]));
+  $query
+  = ' select count(u.id) as total,'
+  . ' sum(u.confirmed) as confirmed, '
+  . ' sum(u.blacklisted) as blacklisted '
+  . ' from ' . $tables['listuser']
+  . ' lu, '.$tables['user'].' u where u.id = lu.userid and listid = ? ';
+  
+  $req = Sql_Query_Params($query, array($row["id"]));
   $membercount = Sql_Fetch_Assoc($req);
   
   $members = $membercount['confirmed'];

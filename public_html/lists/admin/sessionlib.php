@@ -1,5 +1,4 @@
 <?php
-
 require_once dirname(__FILE__).'/accesscheck.php';
 
   # try to set the configuration
@@ -67,7 +66,8 @@ require_once dirname(__FILE__).'/accesscheck.php';
     } else {
       $retval = sql_query(sprintf('update %s SET data = "%s", lastactive = UNIX_TIMESTAMP(NOW()) where sessionid = "%s"',
 $SessionTableName,$val,$SessionID));
-      if (sql_affected_rows() < 0) {
+      if (mysql_affected_rows() < 0) {
+        logError("unable to update session data for session $SessionID");
         sendError("unable to update session data for session $SessionID");
       }
     }
