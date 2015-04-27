@@ -11,16 +11,8 @@ if (isset($_REQUEST['_SERVER'])) { exit; }
 $cline = array();
 $GLOBALS['commandline'] = 0;
 
-require_once dirname(__FILE__) .'/inc/unregister_globals.php';
-require_once dirname(__FILE__) .'/inc/magic_quotes.php';
-
-/* no idea why it wouldn't be there (no dependencies are mentioned on php.net/mb_strtolower), but
- * found a system missing it. We need it from the start */
-if (!function_exists('mb_strtolower')) {
-  function mb_strtolower($string) {
-    return strtolower($string);
-  }
-}
+require_once dirname(__FILE__) .'/commonlib/lib/unregister_globals.php';
+require_once dirname(__FILE__) .'/commonlib/lib/magic_quotes.php';
 
 # setup commandline
 #if (php_sapi_name() == "cli") {
@@ -92,7 +84,11 @@ require_once dirname(__FILE__)."/defaultconfig.php";
 
 require_once dirname(__FILE__).'/connect.php';
 include_once dirname(__FILE__)."/lib.php";
-require_once dirname(__FILE__)."/inc/interfacelib.php";
+if (INTERFACELIB == 2 && is_file(dirname(__FILE__).'/interfacelib.php')) {
+  require_once dirname(__FILE__)."/interfacelib.php";
+} else {
+  require_once dirname(__FILE__)."/commonlib/lib/interfacelib.php";
+}
 
 if (!empty($_SESSION['hasconf']) || Sql_Table_exists($tables["config"],1)) {
   $_SESSION['hasconf'] = true;
@@ -170,8 +166,7 @@ if ($GLOBALS["commandline"]) {
   if (CHECK_REFERRER && isset($_SERVER['HTTP_REFERER'])) {
     ## do a crude check on referrer. Won't solve everything, as it can be faked, but shouldn't hurt
     $ref = parse_url($_SERVER['HTTP_REFERER']);
-    $parts = explode(':', $_SERVER['HTTP_HOST']);
-    if ($ref['host'] != $parts[0] && !in_array($ref['host'],$allowed_referrers)) {
+    if ($ref['host'] != $_SERVER['HTTP_HOST'] && !in_array($ref['host'],$allowed_referrers)) {
       print 'Access denied';exit;
     }
   }
@@ -217,7 +212,7 @@ if (isset($GLOBALS["installation_name"])) {
 }
 print "$page_title</title>";
 
-if (!empty($GLOBALS["require_login"])) {
+if (isset($GLOBALS["require_login"]) && $GLOBALS["require_login"]) {
   if ($GLOBALS["admin_auth_module"] && is_file("auth/".$GLOBALS["admin_auth_module"])) {
     require_once "auth/".$GLOBALS["admin_auth_module"];
   } elseif ($GLOBALS["admin_auth_module"] && is_file($GLOBALS["admin_auth_module"])) {
@@ -267,23 +262,6 @@ if (!empty($GLOBALS["require_login"])) {
       	$msg = $GLOBALS['I18N']->get('Failed sending a change password token');
       }
       $page = "login";
-  } elseif (!empty($_GET['secret']) && ($_GET['page'] == 'processbounces' || $_GET['page'] == 'processqueue' || $_GET['page'] == 'processcron')) {
-    ## remote processing call
-    $ourSecret = getConfig('remote_processing_secret');
-    if ($ourSecret != $_GET['secret']) {
-      @ob_end_clean();
-      print 'Error'.': '.s('Incorrect processing secret');
-      exit;
-    }
-    
-    $_SESSION["adminloggedin"] = $_SERVER["REMOTE_ADDR"];
-    $_SESSION["logindetails"] = array(
-      "adminname" => 'remotecall',
-      "id" => 0,
-      "superuser" => 0,
-      "passhash" => 'xxxx',
-    );
-
   } elseif (!isset($_SESSION["adminloggedin"]) || !$_SESSION["adminloggedin"]) {
     #$msg = 'Not logged in';
     $page = "login";
@@ -512,7 +490,7 @@ if (checkAccess($page,"") || $page == 'about') {
         unset($_SESSION['action_result']);
       }
 
-      if ($GLOBALS['commandline'] || !empty($_GET['secret'])) {
+      if ($GLOBALS['commandline']) {
         @ob_end_clean();
         @ob_start();
       }
@@ -580,8 +558,8 @@ if (isset($GLOBALS["statslog"])) {
 }
   print '-->';
 
-if (!empty($GLOBALS['inRemoteCall']) || $ajax || !empty($GLOBALS["commandline"])) {
-  @ob_end_clean();
+if ($ajax || !empty($GLOBALS["commandline"])) {
+  @ob_clean();
   exit;
 } elseif (!isset($_GET["omitall"])) {
   if (!$GLOBALS['compression_used']) {
@@ -627,3 +605,4 @@ function parseCline() {
   ob_start();*/
   return $res;
 }
+

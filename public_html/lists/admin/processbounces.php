@@ -1,30 +1,11 @@
 <?php
 require_once dirname(__FILE__).'/accesscheck.php';
-$inRemoteCall = false;
 
 if (!$GLOBALS["commandline"]) {
   ob_end_flush();
   if (!MANUALLY_PROCESS_BOUNCES) {
     print $GLOBALS['I18N']->get("This page can only be called from the commandline");
     return;
-  }
-  if (isset($_GET['login']) || isset($_GET['password'])) {
-    print Error(s('Remote processing of the queue is now handled with a processing secret'));
-    return;
-  }
-  $inRemoteCall = false;
-
-  if (isset($_GET['secret'])) {
-    $ourSecret = getConfig('remote_processing_secret');
-    if ($ourSecret != $_GET['secret']) {
-      print Error(s('Incorrect processing secret'));
-      return;
-    } else {
-      $inRemoteCall = true;
-    }
-  } else {
-    ## we're in a normal session, so the csrf token should work
-    verifyCsrfGetToken();
   }
 } else {
   ob_end_clean();
@@ -202,7 +183,7 @@ function processImapBounce ($link,$num,$header) {
     addslashes($header),
     addslashes($body)));
 
-  $bounceid = Sql_Insert_Id();
+  $bounceid = Sql_Insert_Id($tables['bounce'], 'id');
   
   return processBounceData($bounceid,$msgid,$userid);
 }
@@ -550,7 +531,7 @@ if (USE_ADVANCED_BOUNCEHANDLING) {
           break;
         case 'blacklistuser':
           logEvent('User '.$userdata['email'].' blacklisted by bounce rule '.PageLink2('bouncerule&amp;id='.$rule['id'],$rule['id']));
-          addUserToBlacklist($userdata['email'],s('Subscriber auto blacklisted  by bounce rule',$rule['id']));
+          addUserToBlacklist($userdata['email'],$GLOBALS['I18N']->get("Auto Blacklisted"),$GLOBALS['I18N']->get("User auto blacklisted for")." ".$GLOBALS['I18N']->get("bounce rule").' '.$rule['id']);
           $advanced_report .= 'User '.$userdata['email'].' blacklisted by bounce rule '.$rule['id']."\n";
           $advanced_report .= 'User: '.$report_linkroot.'/?page=user&amp;id='.$userdata['id']."\n";
           $advanced_report .= 'Rule: '.$report_linkroot.'/?page=bouncerule&amp;id='.$rule['id']."\n";
@@ -559,7 +540,7 @@ if (USE_ADVANCED_BOUNCEHANDLING) {
           break;
         case 'blacklistuseranddeletebounce':
           logEvent('User '.$userdata['email'].' blacklisted by bounce rule '.PageLink2('bouncerule&amp;id='.$rule['id'],$rule['id']));
-          addUserToBlacklist($userdata['email'],s('Subscriber auto blacklisted by bounce rule %d',$rule['id']));
+          addUserToBlacklist($userdata['email'],$GLOBALS['I18N']->get("Auto Blacklisted"),$GLOBALS['I18N']->get("User auto blacklisted for")." ".$GLOBALS['I18N']->get("bounce rule").' '.$rule['id']);
           $advanced_report .= 'User '.$userdata['email'].' blacklisted by bounce rule '.$rule['id']."\n";
           $advanced_report .= 'User: '.$report_linkroot.'/?page=user&amp;id='.$userdata['id']."\n";
           $advanced_report .= 'Rule: '.$report_linkroot.'/?page=bouncerule&amp;id='.$rule['id']."\n";
@@ -569,7 +550,7 @@ if (USE_ADVANCED_BOUNCEHANDLING) {
           break;
         case 'blacklistemail':
           logEvent('email '.$userdata['email'].' blacklisted by bounce rule '.PageLink2('bouncerule&amp;id='.$rule['id'],$rule['id']));
-          addEmailToBlackList($userdata['email'],s('Email address auto blacklisted by bounce rule %d', $rule['id']));
+          addEmailToBlackList($userdata['email'],$GLOBALS['I18N']->get("Auto Blacklisted"),$GLOBALS['I18N']->get("email auto blacklisted for")." ".$GLOBALS['I18N']->get("bounce rule").' '.$rule['id']);
           $advanced_report .= 'email '.$userdata['email'].' blacklisted by bounce rule '.$rule['id']."\n";
           $advanced_report .= 'User: '.$report_linkroot.'/?page=user&amp;id='.$userdata['id']."\n";
           $advanced_report .= 'Rule: '.$report_linkroot.'/?page=bouncerule&amp;id='.$rule['id']."\n";
@@ -578,7 +559,7 @@ if (USE_ADVANCED_BOUNCEHANDLING) {
           break;
         case 'blacklistemailanddeletebounce':
           logEvent('email '.$userdata['email'].' blacklisted by bounce rule '.PageLink2('bouncerule&amp;id='.$rule['id'],$rule['id']));
-          addEmailToBlackList($userdata['email'],s('Email address auto blacklisted by bounce rule %d',$rule['id']));
+          addEmailToBlackList($userdata['email'],$GLOBALS['I18N']->get("Auto Blacklisted"),$GLOBALS['I18N']->get("User auto blacklisted for")." ".$GLOBALS['I18N']->get("bounce rule").' '.$rule['id']);
           $advanced_report .= 'email '.$userdata['email'].' blacklisted by bounce rule '.$rule['id']."\n";
           $advanced_report .= 'User: '.$report_linkroot.'/?page=user&amp;id='.$userdata['id']."\n";
           $advanced_report .= 'Rule: '.$report_linkroot.'/?page=bouncerule&amp;id='.$rule['id']."\n";
@@ -630,9 +611,11 @@ while ($user = Sql_Fetch_Row($userid_req)) {
     //$user[0]));
     
   ## 17361 - update of the above query, to include the bounce table and to exclude duplicate bounces  
-  $msg_req = Sql_Query(sprintf('select umb.*,um.*,b.status,b.comment from %s um left join %s umb on (um.messageid = umb.message and userid = user)
+  $msg_req = Sql_Query(sprintf('select umb.*,um.*,b.status from %s um left join %s umb on (um.messageid = umb.message and userid = user)
     left join %s b on umb.bounce = b.id 
     where userid = %d and um.status = "sent" 
+      and bounce is not null and 
+      viewed is null and b.status not like "duplicate%%" and b.comment not like "duplicate%%"
     order by entered desc',
     $tables["usermessage"],$tables["user_message_bounce"],$tables["bounce"],
     $user[0]));
@@ -677,33 +660,31 @@ while ($user = Sql_Fetch_Row($userid_req)) {
       ProcessError("Process Killed by other process");
     }
 
-    if (stripos($bounce['status'],'duplicate') === false && stripos($bounce['comment'],'duplicate') === false) {
-      if (sprintf('%d',$bounce["bounce"]) == $bounce["bounce"]) {
-        $cnt++;
-        if ($cnt >= $bounce_unsubscribe_threshold) {
-          if (!$unsubscribed) {
-            output(sprintf('unsubscribing %d -> %d bounces',$user[0],$cnt));
-            $userurl = PageLink2("user&amp;id=$user[0]",$user[0]);
-            logEvent(s('User (url:%s) has consecutive bounces (%d) over threshold (%d), user marked unconfirmed',$userurl,$cnt,$bounce_unsubscribe_threshold));
-            $emailreq = Sql_Fetch_Row_Query("select email from {$tables["user"]} where id = $user[0]");
-            addUserHistory($emailreq[0],s('Auto Unconfirmed'),s('Subscriber auto unconfirmed for %d consecutive bounces',$cnt));
-            Sql_Query(sprintf('update %s set confirmed = 0 where id = %d',$tables["user"],$user[0]));
-            $email_req = Sql_Fetch_Row_Query(sprintf('select email from %s where id = %d',$tables["user"],$user[0]));
-            $unsubscribed_users .= $email_req[0]."\t\t($cnt)\t\t". $GLOBALS['scheme'].'://'.getConfig('website').$GLOBALS['adminpages'].'/?page=user&amp;id='.$user[0]. "\n";
-            $unsubscribed = 1;
-          }
-          if (BLACKLIST_EMAIL_ON_BOUNCE && $cnt >= BLACKLIST_EMAIL_ON_BOUNCE) {
-            $removed = 1;
-            #0012262: blacklist email when email bounces
-            cl_output(s('%d consecutive bounces, threshold reached, blacklisting subscriber',$cnt));
-            addEmailToBlackList($emailreq[0], s('%d consecutive bounces, threshold reached',$cnt));
-          }
+    if (sprintf('%d',$bounce["bounce"]) == $bounce["bounce"]) {
+      $cnt++;
+      if ($cnt >= $bounce_unsubscribe_threshold) {
+        if (!$unsubscribed) {
+          output(sprintf('unsubscribing %d -> %d bounces',$user[0],$cnt));
+          $userurl = PageLink2("user&amp;id=$user[0]",$user[0]);
+          logEvent(s('User (url:%s) has consecutive bounces (%d) over threshold (%d), user marked unconfirmed',$userurl,$cnt,$bounce_unsubscribe_threshold));
+          $emailreq = Sql_Fetch_Row_Query("select email from {$tables["user"]} where id = $user[0]");
+          addUserHistory($emailreq[0],s('Auto Unconfirmed'),s('Subscriber auto unconfirmed for %d consecutive bounces',$cnt));
+          Sql_Query(sprintf('update %s set confirmed = 0 where id = %d',$tables["user"],$user[0]));
+          $email_req = Sql_Fetch_Row_Query(sprintf('select email from %s where id = %d',$tables["user"],$user[0]));
+          $unsubscribed_users .= $email_req[0]."\t\t($cnt)\t\t". $GLOBALS['scheme'].'://'.getConfig('website').$GLOBALS['adminpages'].'/?page=user&amp;id='.$user[0]. "\n";
+          $unsubscribed = 1;
         }
-      } elseif ($bounce["bounce"] == "") {
-        #$cnt = 0; DT 051105
-        $cnt = 0;
-        $msgokay = 1; #DT 051105 - escaping loop if message received okay
+        if (BLACKLIST_EMAIL_ON_BOUNCE && $cnt >= BLACKLIST_EMAIL_ON_BOUNCE) {
+          $removed = 1;
+          #0012262: blacklist email when email bounces
+          cl_output(s('%d consecutive bounces, threshold reached, blacklisting subscriber',$cnt));
+          addEmailToBlackList($emailreq[0], s('%d consecutive bounces, threshold reached',$cnt));
+        }
       }
+    } elseif ($bounce["bounce"] == "") {
+      #$cnt = 0; DT 051105
+      $cnt = 0;
+      $msgokay = 1; #DT 051105 - escaping loop if message received okay
     }
   }
   if ($usercnt % 5 == 0) {

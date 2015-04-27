@@ -13,14 +13,8 @@
 <head>
 <meta http-equiv="pragma" content="no-cache" />
 <meta http-equiv="Cache-Control" content="no-cache, must-revalidate" />
-<link rev="made" href="mailto:info%40phplist.com" />
-<link rel="home" href="http://www.phplist.com" title="phplist homepage" />
-<link rel="license" href="http://www.gnu.org/copyleft/gpl.html" title="GNU General Public License" />
-<meta name="Author" content="Michiel Dethmers - http://www.phplist.com" />
-<meta name="Copyright" content="Michiel Dethmers, phpList Ltd - http://phplist.com" />
-<meta name="Powered-By" content="phplist version <?php echo VERSION?>" />
 <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
-<link rel="SHORTCUT ICON" id="favicon" href="./images/phplist.ico" />
+<link rel="SHORTCUT ICON" id="favicon" href="./images/favicon.ico" />
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
 
 <!-- initial styles and JS from basic application -->

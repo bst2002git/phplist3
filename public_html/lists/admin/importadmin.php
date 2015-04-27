@@ -82,7 +82,7 @@ if(!empty($_POST['import'])) {
 
         if (!$test_import) {
           Sql_Query(sprintf('insert into %s (name,type,listorder,default_value,required,tablename) values("%s","%s",0,"",0,"%s")', $tables["adminattribute"],addslashes($attribute),"textline",$lc_name));
-          $attid = Sql_Insert_id();
+          $attid = Sql_Insert_Id($tables['adminattribute'], 'id');
         } else $attid = 0;
       } else {
         $d = Sql_Fetch_Row($req);
@@ -187,7 +187,7 @@ if(!empty($_POST['import'])) {
             loginname = "%s",
             namelc = "%s",
             modifiedby = "%s",
-            passwordchanged = now(), 
+            passwordchanged = current_timestamp, 
             password = "%s",
             superuser = 0,
             disabled = 0,
@@ -201,12 +201,12 @@ if(!empty($_POST['import'])) {
 
           $query = sprintf('INSERT INTO %s
             (email,loginname,namelc,created,modifiedby,passwordchanged,password,superuser,disabled,privileges)
-            values("%s","%s","%s",now(),"%s",now(),"%s",0,0,"%s")',
+            values("%s","%s","%s",current_timestamp,"%s",current_timestamp,"%s",0,0,"%s")',
             $tables["admin"],sql_escape($email),sql_escape($loginname),
             normalize($loginname),adminName($_SESSION["logindetails"]["id"]),
             encryptPass($data["password"]),sql_escape(serialize($privs)));
           $result = Sql_query($query);
-          $adminid = Sql_insert_id();
+          $adminid = Sql_Insert_Id($tables['admin'], 'id');
           $count_email_add++;
           $some = 1;
         }
@@ -221,12 +221,14 @@ if(!empty($_POST['import'])) {
             switch ($att[0]) {
               case "select":
               case "radio":
-                $val = Sql_Query("select id from $table_prefix"."adminattr_$att[1] where name = \"$value\"");
-                # if we don't have this value add it
-                if (!Sql_Affected_Rows()) {
-                  Sql_Query("insert into $table_prefix"."adminattr_$att[1] (name) values(\"$value\")");
+                $query = "select id from ${table_prefix}adminattr_$att[1] where name = ?";
+                $val = Sql_Query_Params($query, array($value));
+                # if we don't have this value add it '
+                if (!Sql_Num_Rows($val)) {
+                  $tn = $table_prefix . 'adminattr_' . $att[1];
+                  Sql_Query_Params("insert into $tn (name) values (?)", array($value));
                   Warn($GLOBALS['I18N']->get("Value")." $value ".$GLOBALS['I18N']->get("added to attribute")." $att[2]");
-                  $att_value = Sql_Insert_Id();
+                  $att_value = Sql_Insert_Id($tn, 'id');
                 } else {
                   $d = Sql_Fetch_Row($val);
                   $att_value = $d[0];

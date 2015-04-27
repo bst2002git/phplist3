@@ -89,14 +89,6 @@ $default_config = array (
   'category'=> 'security',
 ),
 
-  ## remote processing secret
-"remote_processing_secret" => array (
- 'value' =>  substr(md5(uniqid(mt_rand(), true)),rand(0,10),rand(10,20)),
- 'description' => s("Secret for remote processing"),
-  'type' => "text",
-  'category'=> 'security',
-),
-
   # admin addresses are other people who receive copies of subscriptions
 "admin_addresses" => array (
   'value' => '',
@@ -186,7 +178,7 @@ $default_config = array (
   'description' => s("Categories for lists. Separate with commas."),
   'type' => "text",
   'allowempty' => true,
-  'category'=> 'list-organisation',
+  'category'=> 'segmentation',
 ),
 
   # width of a textline field
@@ -687,26 +679,30 @@ if (!function_exists("getconfig")) {
       $hasconf = $_SESSION['hasconf'];
     }
 
-		$value = "";
-		if (!empty($hasconf)) {
-			$req = Sql_Query(sprintf('select value,editable from %s where item = "%s"', $tables['config'],sql_escape($item)));
-        if (!Sql_Affected_Rows() || !$hasconf) {
-          if (isset ($default_config[$item])) {
-            $value = $default_config[$item]['value'];
-          }
-          # save the default value to the database, so we can obtain
-          # the information when running from commandline
-          if (Sql_Table_Exists($tables["config"])) {
-            saveConfig($item, $value);
-          }
-          #    print "$item => $value<br/>";
-        } else {
-          $row = Sql_Fetch_Row($req);
-          $value = $row[0];
-          if (!empty($default_config[$item]['hidden'])) {
-            $GLOBALS['noteditableconfig'][] = $item;
-          }
+		$toget = $item;
+		$value = '';
+		if ($hasconf) {
+			$query
+			= ' select value,editable'
+			. ' from ' . $tables['config']
+			. ' where item = ?';
+			$req = Sql_Query_Params($query, array($toget));
+			if (!Sql_Num_Rows($req) || !$hasconf) {
+				if (isset ($default_config[$item])) {
+					$value = $default_config[$item]['value'];
+				}
+				# save the default value to the database, so we can obtain
+				# the information when running from commandline
+				if (Sql_Table_Exists($tables["config"]))
+					saveConfig($item, $value);
+				#    print "$item => $value<br/>";
+			} else {
+				$row = Sql_Fetch_Row($req);
+				$value = $row[0];
+        if (!empty($default_config[$item]['hidden'])) {
+          $GLOBALS['noteditableconfig'][] = $item;
         }
+			}
 		}
 		$value = str_replace('[WEBSITE]', $website, $value);
 		$value = str_replace('[DOMAIN]', $domain, $value);
@@ -759,7 +755,8 @@ function getUserConfig($item, $userid = 0) {
   $value = '';
 
   if ($hasconf) {
-    $req = Sql_Query(sprintf('select value,editable from %s where item = "%s"',$tables['config'],sql_escape($item)));
+    $query = 'select value,editable from ' . $tables['config'] . ' where item = ?';
+    $req = Sql_Query_Params($query, array($item));
 
     if (!Sql_Num_Rows($req)) {
       if ( array_key_exists($item, $default_config) ) { 
@@ -781,7 +778,8 @@ function getUserConfig($item, $userid = 0) {
   }
 
   if ($userid) {
-    $rs = Sql_Query(sprintf('select uniqid, email from ' . $tables['user'] . ' where id = %d',$userid));
+    $query = 'select uniqid, email from ' . $tables['user'] . ' where id = ?';
+    $rs = Sql_Query_Params($query, array($userid));
     $user_req = Sql_Fetch_Row($rs);
     $uniqid = $user_req[0];
     $email = $user_req[1];

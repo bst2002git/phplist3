@@ -1,4 +1,5 @@
 <?php
+//error_reporting(-1); //chpock wennn problem mit plugins
 require_once dirname(__FILE__).'/accesscheck.php';
 
 $GLOBALS["plugins"] = array();
@@ -76,7 +77,6 @@ foreach ($pluginFiles as $file) {
       include_once $file;
       if (class_exists($className)) {
         $pluginInstance = new $className();
-        $pluginInstance->origin = $file;
       #  print "Instance $className<br/>";
         ## bit of a duplication of plugins, but $GLOBALS['plugins'] should only contain active ones
         ## using "allplugins" allow listing them, and switch on/off in the plugins page
@@ -171,21 +171,5 @@ function pluginsCall($method) {
   }
 }
 
-function pluginCanEnable($plugin) {
-  global $allplugins;
 
-  $canEnable = false;
-
-  if (isset($allplugins[$plugin])) {
-    $dependencies = $allplugins[$plugin]->dependencyCheck();
-    $dependencyDesc = array_search(false, $dependencies);
-
-    if ($dependencyDesc === false) {
-        $canEnable = true;        
-    } else {
-        $allplugins[$plugin]->dependencyFailure = $dependencyDesc;
-    }
-  }
-  return $canEnable;
-}
 

@@ -300,10 +300,6 @@ $(document).ready(function() {
     setTimeout("refreshExport()",10000);
   })
 
-  $("#selectallcheckbox").click(function() {
-     $(':checkbox').prop('checked', this.checked);
-  })
-
   //fade out 'actionresult' user feedback
   $('.actionresult').delay(4000).fadeOut(4000); 
   //fade out 'result' user feedback

@@ -24,26 +24,28 @@ if (isset($_REQUEST['list'])) {
 $access = accessLevel('export');
 switch ($access) {
   case 'owner':
-    $querytables = $GLOBALS['tables']['list'].' list INNER JOIN '. $GLOBALS['tables']['listuser'].' listuser ON listuser.listid = list.id'.
-                                                   ' INNER JOIN '.$GLOBALS['tables']['user'].' user ON listuser.userid = user.id';
-    $subselect = ' and list.owner = ' . $_SESSION['logindetails']['id'];
+    $querytables = $GLOBALS['tables']['list'].' list ,'.$GLOBALS['tables']['user'].' user ,'.$GLOBALS['tables']['listuser'].' listuser ';
+    $subselect = ' and listuser.listid = list.id and listuser.userid = user.id and list.owner = ' . $_SESSION['logindetails']['id'];
     $listselect_where = ' where owner = ' . $_SESSION['logindetails']['id'];
+    $listselect_and = ' and owner = ' . $_SESSION['logindetails']['id'];
     break;
   case 'all':
     if ($list) {
-      $querytables = $GLOBALS['tables']['user'].' user'.', '.$GLOBALS['tables']['listuser'].' listuser ON user.id = listuser.userid';
-      $subselect = '';
+      $querytables = $GLOBALS['tables']['user'].' user'.', '.$GLOBALS['tables']['listuser'].' listuser';
+      $subselect = ' and listuser.userid = user.id ';
     } else {
       $querytables = $GLOBALS['tables']['user'].' user';
       $subselect = '';
     }
     $listselect_where = '';
+    $listselect_and = '';
     break;
   case 'none':
   default:
     $querytables = $GLOBALS['tables']['user'].' user';
     $subselect = ' and user.id = 0';
     $listselect_where = ' where owner = 0';
+    $listselect_and = ' and owner = 0';
     break;
 }
 
@@ -76,11 +78,11 @@ print formStart();
 ?>
 
 <?php echo $GLOBALS['I18N']->get('What date needs to be used:');?><br/>
-<input type="radio" name="column" value="nodate" /> <?php echo s('Any date');?> (<?php echo s('Export all subscribers');?>)<br/>
-<input type="radio" name="column" value="entered" checked="checked" /> <?php echo s('When they signed up');?><br/>
-<input type="radio" name="column" value="modified" /> <?php echo s('When the record was changed');?><br/>
-<input type="radio" name="column" value="historyentry" /> <?php echo s('Based on changelog');?><br/>
-<input type="radio" name="column" value="listentered" /> <?php echo s('When they subscribed to');?> 
+<input type="radio" name="column" value="nodate" /> <?php echo $GLOBALS['I18N']->get('Any date');?><br/>
+<input type="radio" name="column" value="entered" checked="checked" /> <?php echo $GLOBALS['I18N']->get('When they signed up');?><br/>
+<input type="radio" name="column" value="modified" /> <?php echo $GLOBALS['I18N']->get('When the record was changed');?><br/>
+<input type="radio" name="column" value="historyentry" /> <?php echo $GLOBALS['I18N']->get('Based on changelog');?><br/>
+<input type="radio" name="column" value="listentered" /> <?php echo $GLOBALS['I18N']->get('When they subscribed to');?> 
 
 
 <?php
@@ -102,8 +104,7 @@ if (empty($list)) {
 </div>
 
 
-<?php echo s('Select the columns to include in the export');?>
-<div><input type="checkbox" name="selectallcheckbox" id="selectallcheckbox" checked="checked" /><label for="selectallcheckbox"><?php echo s('Select all')?> </label></div>
+<?php echo $GLOBALS['I18N']->get('Select the columns to include in the export');?>
 
 <?php
   $cols = array();

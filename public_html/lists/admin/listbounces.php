@@ -10,10 +10,12 @@ $isowner_where = '';
 
 switch ($access) {
   case "owner":
+    $subselect = " where owner = ".$_SESSION["logindetails"]["id"];
     if ($listid) {
-      $req = Sql_Query(sprintf('select id from ' . $tables['list'] .' where owner = %d and id = %d',$_SESSION["logindetails"]["id"], $listid));
-      if (!Sql_Affected_Rows()) {
-        Fatal_Error($GLOBALS['I18N']->get("You do not have enough privileges to view this page"));
+      $query = "select id from " . $tables['list'] . $subselect . " and id = ?";
+      $rs = Sql_Query_Params($query, array($listid));
+      if (!Sql_Num_Rows($rs)) {
+        Fatal_Error($GLOBALS['I18N']->get("You do not have enough priviliges to view this page"));
         return;
       }
     }
@@ -26,7 +28,7 @@ switch ($access) {
   case "none":
   default:
     if ($listid) {
-      Fatal_Error($GLOBALS['I18N']->get("You do not have enough privileges to view this page"));
+      Fatal_Error($GLOBALS['I18N']->get("You do not have enough priviliges to view this page"));
       $isowner_and = sprintf(" list.owner = 0 and ");
       $isowner_where = sprintf(" where list.owner = 0 ");
       return;
@@ -53,16 +55,22 @@ if (!$listid) {
   }
   return;
 }
-$query = sprintf('select lu.userid, count(umb.bounce) as numbounces from %s lu join %s umb on lu.userid = umb.user
-  where '.
-#  now() < date_add(umb.time,interval 6 month) and 
- ' lu.listid = %d
-  group by lu.userid
-  ',$GLOBALS['tables']['listuser'], $GLOBALS['tables']['user_message_bounce'],$listid);
-  
-$req = Sql_Query($query);
 
-$total = Sql_Affected_Rows();
+$query
+= ' select lu.userid, count(umb.bounce) as numbounces'
+. ' from %s lu'
+. '    join %s umb'
+. '       on lu.userid = umb.user'
+. ' where '
+#. ' current_timestamp < date_add(umb.time,interval 6 month) '
+#. ' and ' 
+. ' lu.listid = ? '
+. ' group by lu.userid '
+;
+$query = sprintf($query, $GLOBALS['tables']['listuser'], $GLOBALS['tables']['user_message_bounce']);
+#print $query;
+$req = Sql_Query_Params($query, array($listid));
+$total = Sql_Num_Rows($req);
 $limit = '';
 $numpp = 150;
 
@@ -77,6 +85,7 @@ if ($total) {
   print PageLinkButton('listbounces&amp;type=dl&amp;id='.$listid,'Download emails');
 }
 
+
 print '<p>'.s('%d bounces to list %s',$total,listName($listid))."</p>";
 
 $start = empty($_GET['start']) ? 0 : sprintf('%d',$_GET['start']);
@@ -87,7 +96,7 @@ if ($total > $numpp && !$download) {
   print simplePaging('listbounces&amp;id='.$listid,$start,$total,$numpp);
 
   $query .= $limit;
-  $req = Sql_Query($query);
+  $req = Sql_Query_Params($query, array($listid));
 }
 
 if ($download) {
@@ -102,14 +111,12 @@ $ls->noShader();
 while ($row = Sql_Fetch_Array($req)) {
   $userdata = Sql_Fetch_Array_Query(sprintf('select * from %s where id = %d',
     $GLOBALS['tables']['user'],$row['userid']));
-  if (!empty($userdata['email'])) {
-    if ($download) {
-      print $userdata['email']."\n";
-    } else {
-      $ls->addElement($row['userid'],PageUrl2('user&amp;id='.$row['userid']));
-      $ls->addColumn($row['userid'],s('address'),$userdata['email']);
-      $ls->addColumn($row['userid'],s('# bounces'),PageLink2('userhistory&id='.$row['userid'],$row['numbounces']));
-    }
+  if ($download) {
+    print $userdata['email']."\n";
+  } else {
+    $ls->addElement($row['userid'],PageUrl2('user&amp;id='.$row['userid']));
+    $ls->addColumn($row['userid'],$GLOBALS['I18N']->get('email'),$userdata['email']);
+    $ls->addColumn($row['userid'],$GLOBALS['I18N']->get('# bounces'),$row['numbounces']);
   }
 }
 if (!$download) {
