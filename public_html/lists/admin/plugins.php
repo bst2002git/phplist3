@@ -57,7 +57,7 @@ if (!empty($_POST['pluginurl']) && class_exists('ZipArchive')) {
     print '<h3>'.s('Installing plugin').'</h3>';
   }
   $zip = new ZipArchive;
-  if (!empty($filename) && $zip->open($GLOBALS['tmpdir'].'/phpListPlugin-'.$filename)) {
+  if (!empty($filename) && $zip->open($GLOBALS['tmpdir'].'/phpListPlugin-'.$filename) === TRUE) {
     
     /* the zip may have a variety of directory structures, as Github seems to add at least one for the "branch" of 
      * the project and then the developer has some more. 
@@ -150,8 +150,8 @@ if (!empty($_POST['pluginurl']) && class_exists('ZipArchive')) {
     } else {
       Error(s('Plugin directory is not writable'));
     }
-  //} else {
-    //Error(s('Invalid plugin package'));
+  } else {
+    Error(s('Invalid plugin package'));
   }
 
   print s('Plugin installation failed');
@@ -199,6 +199,11 @@ foreach ($GLOBALS['allplugins'] as $pluginname => $plugin) {
   $details .= '<span class="value">'.$plugin->version. '</span></div>';
   $details .= '<div class="detail"><span class="label">'.s('description').'</span>';
   $details .= '<span class="value">'.$plugin->description. '</span></div>';
+  if (!empty($GLOBALS['developer_email'])) {
+    ## show the origin of the plugin, as many may exist
+    $details .= '<div class="detail"><span class="label">'.s('origin').'</span>';
+    $details .= '<span class="value">'.$plugin->origin. '</span></div>';
+  }
   
 #  $ls->addRow($pluginname,s('description'),$plugin->description);
  # $ls->addColumn($pluginname,s('version'),$plugin->version);
@@ -217,9 +222,15 @@ foreach ($GLOBALS['allplugins'] as $pluginname => $plugin) {
     $details .= '<div class="detail"><span class="label">'.s('developer').'</span>';
     $details .= '<span class="value">'.$pluginDetails['developer']. '</span></div>';
   }
-  $ls->addColumn($pluginname,s('enabled'),$plugin->enabled ? 
+  if (!empty($plugin->documentationUrl)) {
+      $details .= '<div class="detail"><span class="label">'.s('More information').'</span>';
+      $details .= '<span class="value"><a href="'.$plugin->documentationUrl. '" target="moreinfoplugin">'.s('Documentation Page'). '</a></span></div>';
+  }
+  if (pluginCanEnable($pluginname)) {
+    $ls->addColumn($pluginname,s('enabled'),$plugin->enabled ? 
     PageLinkAjax('plugins&disable='.$pluginname,$GLOBALS['img_tick']) : 
     PageLinkAjax('plugins&enable='.$pluginname,$GLOBALS['img_cross']));
+  }
   if (DEVVERSION) {
     //$ls->addColumn($pluginname,s('initialise'),$plugin->enabled ? 
       //PageLinkAjax('plugins&initialise='.$pluginname,s('Initialise')) : '');
@@ -233,6 +244,11 @@ foreach ($GLOBALS['allplugins'] as $pluginname => $plugin) {
   if (!empty($pluginDetails['installUrl']) && is_writable($pluginDestination.'/'.$pluginname)) {
     ## we can only delete the ones that were installed from the interface
     $ls->addColumn($pluginname,s('delete'),'<span class="delete"><a href="javascript:deleteRec(\'./?page=plugins&delete='.$pluginname. '\');" class="button" title="'.s('delete this plugin').'">'.s('delete').'</a></span>');
+  }
+  
+  if (!pluginCanEnable($pluginname)) {
+    $details .= '<div class="detail"><span class="label">'.s('Dependency check').'</span>';
+    $details .= '<span class="value">'.s('Plugin can not be enabled, because it fails a dependency check - '). $plugin->dependencyFailure . '</span></div>';
   }
   
   if (!empty($pluginDetails['installUrl']) && class_exists('ZipArchive')) {

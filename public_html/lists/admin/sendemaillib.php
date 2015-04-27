@@ -69,9 +69,8 @@ function sendEmail ($messageid,$email,$hash,$htmlpref = 0,$rssitems = array(),$f
     }
   }
  # print '<pre>';var_dump($user_att_values);print '</pre>';exit;
-  $query = sprintf('select * from %s where email = ?', $GLOBALS["tables"]["user"]);
-  $rs = Sql_Query_Params($query, array($email));
-  $userdata = Sql_Fetch_Assoc($rs);
+  $query = sprintf('select * from %s where email = "%s"', $GLOBALS["tables"]["user"],sql_escape($email));
+  $userdata = Sql_Fetch_Assoc_Query($query);
   if (empty($userdata['id'])) {
     $userdata = array();
   }
@@ -185,10 +184,8 @@ function sendEmail ($messageid,$email,$hash,$htmlpref = 0,$rssitems = array(),$f
   $url = getConfig("forwardurl");
 
   # make sure there are no newlines, otherwise they get turned into <br/>s
-  $html["forwardform"] = sprintf('<form method="get" action="%s" name="forwardform" class="forwardform"><input type="hidden" name="uid" value="%s" /><input type="hidden" name="mid" value="%d" /><input type="hidden" name="p" value="forward" /><input type=text name="email" value="" class="forwardinput" /><input name="Send" type="submit" value="%s" class="forwardsubmit"/></form>',$url,$hash,$messageid,$GLOBALS['strForward']);
+  $html["forwardform"] = '';#sprintf('<form method="get" action="%s" name="forwardform" class="forwardform"><input type="hidden" name="uid" value="%s" /><input type="hidden" name="mid" value="%d" /><input type="hidden" name="p" value="forward" /><input type=text name="email" value="" class="forwardinput" /><input name="Send" type="submit" value="%s" class="forwardsubmit"/></form>',$url,$hash,$messageid,$GLOBALS['strForward']);
   $text["signature"] = "\n\n-- powered by phpList, www.phplist.com --\n\n";
-  //chpock
-  $text["signature"] = '';
   $url = getConfig("preferencesurl");$sep = strpos($url,'?') === false ? '?':'&';
   $html["preferences"] = sprintf('<a href="%s%suid=%s">%s</a>',$url,htmlspecialchars($sep),$hash,$strThisLink);
   $text["preferences"] = sprintf('%s%suid=%s',$url,$sep,$hash);
@@ -239,9 +236,6 @@ function sendEmail ($messageid,$email,$hash,$htmlpref = 0,$rssitems = array(),$f
   } else {
     $html["signature"] = $PoweredByText;
   }
-  //chpock
-  $html["signature"] ='';
-
 #  $content = $cached[$messageid]["htmlcontent"];
 
   if (VERBOSE && $getspeedstats) {
@@ -399,7 +393,8 @@ function sendEmail ($messageid,$email,$hash,$htmlpref = 0,$rssitems = array(),$f
   }
   # make sure to only include usertrack once, otherwise the stats would go silly
   $htmlmessage = str_ireplace('[USERTRACK]','',$htmlmessage);
-
+  $textmessage = str_ireplace('[USERTRACK]','',$textmessage);
+   
   $html['subject'] = $cached[$messageid]["subject"];
   $text['subject'] = $cached[$messageid]["subject"];
   
@@ -616,7 +611,7 @@ function sendEmail ($messageid,$email,$hash,$htmlpref = 0,$rssitems = array(),$f
       $link = str_replace('"','',$link);  
       ## http://www.google.com/support/analytics/bin/answer.py?hl=en&answer=55578
 
-      $trackingcode = 'utm_source=emailcampaign'.$messageid.'&utm_medium=phpList&utm_content=HTML&utm_campaign='.urlencode($cached[$messageid]["subject"]);
+      $trackingcode = 'utm_source=phplist'.$messageid.'&utm_medium=email&utm_content=HTML&utm_campaign='.urlencode($cached[$messageid]["subject"]);
       ## take off existing tracking code, if found
       if (strpos($link,'utm_medium') !== false) {
         $link = preg_replace('/utm_(\w+)\=[^&]+&/U','',$link);
@@ -653,7 +648,8 @@ function sendEmail ($messageid,$email,$hash,$htmlpref = 0,$rssitems = array(),$f
   
       if (preg_match('/^http|ftp/',$link) && (stripos($link, 'www.phplist.com') !== 0)  ) {# && !strpos($link,$clicktrack_root)) {
         $url = cleanUrl($link,array('PHPSESSID','uid'));
-        $trackingcode = 'utm_source=emailcampaign'.$messageid.'&utm_medium=phpList&utm_content=text&utm_campaign='.urlencode($cached[$messageid]["subject"]);
+        //@alpha1: maybe source should be message id?
+        $trackingcode = 'utm_source=phplist'.$messageid.'&utm_medium=email&utm_content=text&utm_campaign='.urlencode($cached[$messageid]["subject"]);
         ## take off existing tracking code, if found
         if (strpos($link,'utm_medium') !== false) {
           $link = preg_replace('/utm_(\w+)\=[^&]+/','',$link);
@@ -967,7 +963,7 @@ function sendEmail ($messageid,$email,$hash,$htmlpref = 0,$rssitems = array(),$f
     if (!empty($mail->mailsize)) {
       $sizename = $htmlpref ? 'htmlsize' : 'textsize';
       if (empty($cached[$messageid][$sizename])) {
-        Sql_Replace($GLOBALS['tables']['messagedata'], array('id' => $messageid, 'name' => $sizename, 'data' => $mail->mailsize), array('name', 'id'));
+        setMessageData($messageid,$sizename,$mail->mailsize);
         $cached[$messageid][$sizename] = $mail->mailsize;
         if (isset($cached[$messageid]['htmlsize'])) {
           output(sprintf(s('Size of HTML email: %s ',formatBytes($cached[$messageid]['htmlsize']))),0,'progress');
@@ -1121,8 +1117,6 @@ function createPDF($text) {
   return $fname;
 }
 
-//function replaceChars() Moved to commonlib
-
 function mailto2href($text) {
   # converts <mailto:blabla> link to <a href="blabla"> links
   #~Bas 0008857
@@ -1215,28 +1209,18 @@ function encodeLinks($text) {
   return $text;
 }
 
-//function stripHTML() Moved to commonlib
-
 function clickTrackLinkId($messageid,$userid,$url,$link) {
   global $cached;
   if (!isset($cached['linktrack']) || !is_array($cached['linktrack'])) $cached['linktrack'] = array();
   if (!isset($cached['linktracksent']) || !is_array($cached['linktracksent'])) $cached['linktracksent'] = array();
   if (!isset($cached['linktrack'][$link])) {
-    $query
-    = ' select id'
-    . ' from ' . $GLOBALS['tables']['linktrack_forward']
-    . ' where url = ?';
-    $rs = Sql_Query_Params($query, array($url));
-    $exists = Sql_Fetch_Row($rs);
+    $exists = Sql_Fetch_Row_Query(sprintf('select id from %s where url = "%s"',
+      $GLOBALS['tables']['linktrack_forward'],sql_escape($url)));
     if (!$exists[0]) {
       $personalise = preg_match('/uid=/',$link);
-      $query
-      = ' insert into ' . $GLOBALS['tables']['linktrack_forward']
-      . '    (url, personalise)'
-      . ' values'
-      . '    (?, ?)';
-      Sql_Query_Params($query, array($url, $personalise));
-      $fwdid = Sql_Insert_Id($GLOBALS['tables']['linktrack_forward'], 'id');
+      Sql_Query(sprintf('insert into %s set url = "%s", personalise = %d',
+        $GLOBALS['tables']['linktrack_forward'],sql_escape($url),$personalise));
+      $fwdid = Sql_Insert_id();
     } else {
       $fwdid = $exists[0];
     }
@@ -1245,26 +1229,18 @@ function clickTrackLinkId($messageid,$userid,$url,$link) {
     $fwdid = $cached['linktrack'][$link];
   }
 
-  if (!isset($cached['linktracksent'][$messageid]) || !is_array($cached['linktracksent'][$messageid]))
-    $cached['linktracksent'][$messageid] = array();
+  if (!isset($cached['linktracksent'][$messageid]) || !is_array($cached['linktracksent'][$messageid])) $cached['linktracksent'][$messageid] = array();
   if (!isset($cached['linktracksent'][$messageid][$fwdid])) {
-    $query
-    = ' select total'
-    . ' from ' . $GLOBALS['tables']['linktrack_ml']
-    . ' where messageid = ?'
-    . '   and forwardid = ?';
-    $rs = Sql_Query_Params($query, array($messageid, $fwdid));
-    if (!Sql_Num_Rows($rs)) {
-      $total = 1;
+    $tot = Sql_Fetch_Row_Query(sprintf('select total from %s where messageid = %d and forwardid = %d',$GLOBALS['tables']['linktrack_ml'],$messageid,$fwdid));
+    if (!Sql_Affected_Rows()) {
       ## first time for this link/message
-      # BCD: Isn't this just an insert?
-      Sql_Replace($GLOBALS['tables']['linktrack_ml'], array('total' => $total, 'messageid' => $messageid, 'forwardid' => $fwdid), array('messageid', 'forwardid'));
+      Sql_Query(sprintf('replace into %s set total = %d,messageid = %d,forwardid = %d',
+        $GLOBALS['tables']['linktrack_ml'],$tot[0]+1,$messageid,$fwdid));
     } else {
-      $tot = Sql_Fetch_Row($rs);
-      $total = $tot[0] + 1;
-      Sql_Query(sprintf('update %s set total = %d where messageid = %d and forwardid = %d', $GLOBALS['tables']['linktrack_ml'], $total, $messageid, $fwdid));
+      Sql_Query(sprintf('update %s set total = %d where messageid = %d and forwardid = %d',
+        $GLOBALS['tables']['linktrack_ml'],$tot[0]+1,$messageid,$fwdid));
     }
-    $cached['linktracksent'][$messageid][$fwdid] = $total;
+    $cached['linktracksent'][$messageid][$fwdid] = $tot[0]+1;
   } else {
     $cached['linktracksent'][$messageid][$fwdid]++;
     ## write every so often, to make sure it's saved when interrupted
@@ -1545,19 +1521,12 @@ exit;
 }  
 
 # make sure the 0 template has the powered by image
-$query
-= ' select *'
-. ' from %s'
-. ' where filename = ?'
-. '   and template = 0';
-$query = sprintf($query, $GLOBALS['tables']['templateimage']);
-$rs = Sql_Query_Params($query, array('powerphplist.png'));
-if (!Sql_Num_Rows($rs)) {
-  $query
-  = ' insert into %s'
-  . '   (template, mimetype, filename, data, width, height)'
-  . ' values (0, ?, ?, ?, ?, ?)';
-  $query = sprintf($query, $GLOBALS["tables"]["templateimage"]);
-  Sql_Query_Params($query, array('image/png', 'powerphplist.png', $newpoweredimage, 70, 30));
-}
+Sql_Query(sprintf('select * from %s where filename = "%s" and template = 0',
+  $GLOBALS["tables"]["templateimage"],"powerphplist.png"));
+if (!Sql_Affected_Rows())
+  Sql_Query(sprintf('insert into %s (template,mimetype,filename,data,width,height)
+  values(0,"%s","%s","%s",%d,%d)',
+  $GLOBALS["tables"]["templateimage"],"image/png","powerphplist.png",
+  $newpoweredimage,
+  70,30));
 

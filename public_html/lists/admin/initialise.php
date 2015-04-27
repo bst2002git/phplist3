@@ -20,9 +20,9 @@ if ($force) {
     if ($table == "attribute") {
       $req = Sql_Query("select tablename from {$tables["attribute"]}");
       while ($row = Sql_Fetch_Row($req))
-        Sql_Drop_Table($table_prefix . 'listattr_' . $row[0]);
+        Sql_Query('drop table if exists '.$table_prefix . 'listattr_' . $row[0]);
     }
-    Sql_Drop_Table($tables[$table]);
+    Sql_Query('drop table if exists '.$tables[$table]);
   }
   session_destroy();
   Redirect('initialise&firstinstall=1');
@@ -69,9 +69,9 @@ while (list($table, $val) = each($DBstruct)) {
     if ($table == "attribute") {
       $req = Sql_Query("select tablename from {$tables["attribute"]}");
       while ($row = Sql_Fetch_Row($req))
-        Sql_Drop_Table($table_prefix . 'listattr_' . $row[0]);
-    }
-    Sql_Drop_Table($tables[$table]);
+        Sql_Query("drop table if exists $table_prefix"."listattr_$row[0]",1);
+     }
+    Sql_query("drop table if exists $tables[$table]");
   }
   $query = "CREATE TABLE $tables[$table] (\n";
   while (list($column, $struct) = each($DBstruct[$table])) {
@@ -113,7 +113,7 @@ while (list($table, $val) = each($DBstruct)) {
         }
         
         Sql_Query(sprintf('insert into %s (loginname,namelc,email,created,modified,password,passwordchanged,superuser,disabled)
-          values("%s","%s","%s",current_timestamp,current_timestamp,"%s",current_timestamp,%d,0)',
+          values("%s","%s","%s",now(),now(),"%s",now(),%d,0)',
           $tables["admin"],"admin","admin",$adminemail,encryptPass($adminpass),1));
 
         ## let's add them as a subscriber as well
@@ -155,11 +155,21 @@ if ($success) {
   # mark the database to be our current version
   SaveConfig('version',VERSION,0);
   # mark now to be the last time we checked for an update
-  Sql_Replace($tables['config'], array('item' => "updatelastcheck", 'value' => 'current_timestamp', 'editable' => '0'), 'item', false);
-  SaveConfig('admin_address',$_REQUEST['adminemail'],1);
+  SaveConfig('updatelastcheck',date("Y-m-d H:i:s",time()),0,true);
+  SaveConfig('admin_address',$adminemail,1);
   SaveConfig('message_from_name',strip_tags($_REQUEST['adminname']),1);
+  SaveConfig('campaignfrom_default',"$adminemail ".strip_tags($_REQUEST['adminname']));
+  SaveConfig('notifystart_default',$adminemail);
+  SaveConfig('notifyend_default',$adminemail);
+  SaveConfig('report_address',$adminemail);
+  SaveConfig('message_from_address',$adminemail);
+  SaveConfig('message_from_name',strip_tags($_REQUEST['adminname']));
+  SaveConfig('message_replyto_address',$adminemail);
+  
   if (!empty($_REQUEST['orgname'])) {
     SaveConfig('organisation_name',strip_tags($_REQUEST['orgname']),1);
+    SaveConfig('campaignfrom_default',"$adminemail ".strip_tags($_REQUEST['orgname']));
+    SaveConfig('message_from_name',strip_tags($_REQUEST['orgname']));
   } elseif (!empty($_REQUEST['adminname'])) {
     SaveConfig('organisation_name',strip_tags($_REQUEST['adminname']),1);
   } else {
@@ -168,28 +178,7 @@ if ($success) {
  
   # add a testlist
   $info = $GLOBALS['I18N']->get("List for testing.");
-  $stmt
-  = ' insert into ' . $tables['list']
-  . '   (name, description, entered, active, owner)'
-  . ' values'
-  . '   (?, ?, current_timestamp, ?, ?)';
-  $result = Sql_Query_Params($stmt, array('test', $info, '0', '1'));
-  # add public newsletter list
-  $info = s("Sign up to our newsletter");
-  $stmt
-  = ' insert into ' . $tables['list']
-  . '   (name, description, entered, active, owner)'
-  . ' values'
-  . '   (?, ?, current_timestamp, ?, ?)';
-  $result = Sql_Query_Params($stmt, array('newsletter', $info, '1', '1'));
-  
-  ## add the admin to the lists
-  Sql_Query(sprintf('insert into %s (listid, userid, entered) values(%d,%d,now())',$tables['listuser'],1,$userid));
-  Sql_Query(sprintf('insert into %s (listid, userid, entered) values(%d,%d,now())',$tables['listuser'],2,$userid));
- 
-  $uri = $_SERVER['REQUEST_URI'];
-  $uri = str_replace('?'.$_SERVER['QUERY_STRING'],'',$uri);
- 
+  $result = Sql_query("insert into {$tables["list"]} (name,description,entered,active,owner) values(\"test\",\"$info\",now(),0,1)");
   $body = '
     Version: '.VERSION."\r\n"
     .' Url: '
@@ -203,27 +192,14 @@ if ($success) {
     .'</a>. </p>', $body);
   //printf('<p class="information">
     //'.$GLOBALS['I18N']->get("Please make sure to read the file README.security that can be found in the zip file.").'</p>');
-  print '<p class="information">'
-    .'<h3>'.s("Sign up to receive news and updates about phpList ").'</h3>'
-    .s("to make sure you are updated when new versions come out. Sometimes security bugs are found which make it important to upgrade. Traffic on the list is very low.").
-'<script type="text/javascript">var pleaseEnter = "'.strip_tags($_REQUEST['adminemail']).'";</script> '.   
-'<script type="text/javascript" src="../js/jquery-1.5.2.min.js"></script> 
-<script type="text/javascript" src="../js/phplist-subscribe-0.3.min.js"></script> 
-<div id="phplistsubscriberesult"></div> <form action="https://announce.hosted.phplist.com/lists/?p=subscribe&id=3" method="post" id="phplistsubscribeform"> 
-<input type="text" name="email" value="" id="emailaddress" /> 
-<button type="submit" id="phplistsubscribe">'.s('Subscribe').'</button> <button id="phplistnotsubscribe" class="fright">'.s('Do not subscribe').'</button></form>'
-    .' </p>';
+  print subscribeToAnnouncementsForm($_REQUEST['adminemail']);
 
   if (ENCRYPT_ADMIN_PASSWORDS && !empty($adminid)) {
     print sendAdminPasswordToken($adminid);
   }
   # make sure the 0 template has the powered by image
-  $query
-  = ' insert into %s'
-  . '   (template, mimetype, filename, data, width, height)'
-  . ' values (0, ?, ?, ?, ?, ?)';
-  $query = sprintf($query, $GLOBALS["tables"]["templateimage"]);
-  Sql_Query_Params($query, array('image/png', 'powerphplist.png', $newpoweredimage, 70, 30));
+  $query = sprintf('insert into %s (template, mimetype, filename, data, width, height) values (0, "image/png", "powerphplist.png", "%s", 70, 30)', $GLOBALS["tables"]["templateimage"],$newpoweredimage);
+  Sql_Query($query);
   print '<div id="continuesetup" style="display:none;" class="fleft">'.$GLOBALS['I18N']->get("Continue with")." ".PageLinkButton("setup",$GLOBALS['I18N']->get("phpList Setup"))."</div>";
 
   unset($_SESSION['hasI18Ntable']);

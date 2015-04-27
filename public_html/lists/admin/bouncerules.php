@@ -72,8 +72,7 @@ print "</div></p>\n";
 $some = 1;
 $req = Sql_Query(sprintf('select * from %s where status = "%s" order by listorder,regex',$GLOBALS['tables']['bounceregex'],$type));
 $ls = new WebblerListing($GLOBALS['I18N']->get('Bounce Regular Expressions'));
-//if (!Sql_Affected_Rows()) { //error
-if (!Sql_Num_Rows($req)) {
+if (!Sql_Affected_Rows()) {
   print $GLOBALS['I18N']->get('No Rules found');
   $some = 0;
 } else {
@@ -90,7 +89,7 @@ while ($row = Sql_Fetch_Array($req)) {
       $ls->addColumn($element,$GLOBALS['I18N']->get('match'),PageLink2('bouncerule&amp;id='.$activerule,$GLOBALS['I18N']->get('match')));
     }
   }
-
+  
   $ls->addColumn($element,$GLOBALS['I18N']->get('expression'),'<a name="'.$row['id'].'"></a>'.shortenTextDisplay($row['regex'],50));
   $ls->addColumn($element,$GLOBALS['I18N']->get('action'),$GLOBALS['bounceruleactions'][$row['action']]);
 #  $num = Sql_Fetch_Row_Query(sprintf('select count(*) from %s where regex = %d',$GLOBALS['tables']['bounceregex_bounce'],$row['id']));
@@ -127,5 +126,5 @@ printf('<tr><td colspan="2">%s</td></tr><tr><td colspan="2"><textarea name="comm
   $GLOBALS['I18N']->get('Memo for this rule'));
 print '<tr><td colspan="2"><p class="submit"><input type="submit" name="add" value="'.$GLOBALS['I18N']->get('Add new Rule').'"></td></tr>';
 print '</table></form>';
-
+  
 ?>

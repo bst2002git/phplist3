@@ -17,7 +17,7 @@ if ($GLOBALS["require_login"] && !isSuperUser()) {
       if ($id) {
         Sql_Query("select id from ".$GLOBALS['tables']["list"]. $subselect . " and id = $id");
         if (!Sql_Affected_Rows()) {
-          Error($GLOBALS['I18N']->get('You do not have enough priviliges to view this page'));
+          Error($GLOBALS['I18N']->get('You do not have enough privileges to view this page'));
           return;
         }
       } else {
@@ -36,7 +36,7 @@ if ($GLOBALS["require_login"] && !isSuperUser()) {
     default:
       $subselect_and = " and owner = -1";
       if ($id) {
-        Fatal_Error($GLOBALS['I18N']->get('You do not have enough priviliges to view this page'));
+        Fatal_Error($GLOBALS['I18N']->get('You do not have enough privileges to view this page'));
         return;
       }
       $subselect = " where id = 0";
@@ -64,29 +64,22 @@ if (!empty($_POST["addnewlist"]) && !empty($_POST["listname"])) {
   }
 
   if ($id) {
-    $query
-    = ' update %s'
-    . ' set name = ?, description = ?, active = ?,'
-    . '     listorder = ?, prefix = ?, owner = ?, category = ?'
-    . ' where id = ?';
-    $query = sprintf($query, $GLOBALS['tables']['list']);
-    $result = Sql_Query_Params($query, array($_POST['listname'],
-       $_POST['description'], $_POST['active'], $_POST['listorder'],
-       $_POST['prefix'], $_POST['owner'], $category, $id));
+    $query = sprintf('update %s set name="%s",description="%s",category="%s",
+    active=%d,listorder=%d,prefix = "%s", owner = %d
+    where id=%d',$tables["list"],sql_escape($_POST["listname"]),
+    sql_escape($_POST["description"]),sql_escape($_POST['category']),$_POST["active"],$_POST["listorder"],
+    $_POST["prefix"],$_POST["owner"],$id);
   } else {
-    $query
-    = ' insert into %s'
-    . '    (name, description, entered, listorder, owner, prefix, active, category)'
-    . ' values'
-    . '    (?, ?, current_timestamp, ?, ?, ?, ?, ?)';
-    $query = sprintf($query, $GLOBALS['tables']['list']);
-#  print $query;
-    $result = Sql_Query_Params($query, array($_POST['listname'],
-       $_POST['description'], $_POST['listorder'], $_POST['owner'],
-       $_POST['prefix'], $_POST['active'], $category));
+    $query = sprintf('insert into %s
+      (name,description,entered,listorder,owner,prefix,active,category)
+      values("%s","%s",now(),%d,%d,"%s",%d,"%s")',
+      $tables["list"],sql_escape($_POST["listname"]),sql_escape($_POST["description"]),
+      $_POST["listorder"],$_POST["owner"],sql_escape($_POST["prefix"]),$_POST["active"],sql_escape($category));
   }
+#  print $query;
+  $result = Sql_Query($query);
   if (!$id) {
-    $id = Sql_Insert_Id($GLOBALS['tables']['list'], 'id');
+    $id = sql_insert_id();
 
     $_SESSION['action_result'] = s('New list added') . ": $id";
     $_SESSION['newlistid'] = $id;
@@ -99,7 +92,7 @@ if (!empty($_POST["addnewlist"]) && !empty($_POST["listname"])) {
   }
   print '<div class="actionresult">'.$_SESSION['action_result'].'</div>';
   if ($_GET['page'] == 'editlist') {
-    print '<div class="actions">'.PageLinkButton('importsimple&amp;list='.$id,s('Add some subscribers')).'</div>';
+    print '<div class="actions">'.PageLinkButton('importsimple&amp;list='.$id,s('Add some subscribers')).' '.PageLinkButton('editlist',s('Add another list')).'</div>';
   }
   unset($_SESSION['action_result']);
   return;
